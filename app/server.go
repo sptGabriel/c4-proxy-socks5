@@ -8,7 +8,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/sptGabriel/socks5/app/packets"
@@ -183,51 +182,12 @@ func (c *Conn) commandConnect(cmd *cmd) error {
 		return err
 	}
 
-	var loginCrypt LoginCrypt
-	var gameCrypt GameCrypt
-	var cryptEnabled bool
+	baseClient, err := NewBaseClient(serverConn, c.rwc, destPort)
+	if err != nil {
+		return err
+	}
 
-	// switch destPort {
-	// case "2106":
-	// 	loginCrypt, err = NewLoginCrypt()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	cryptEnabled = true
-	// case "7777":
-	// 	gameCrypt = NewGameCrypt()
-	// 	cryptEnabled = true
-	// }
-	// Criar canais para fazer o tráfego de dados entre cliente e servidor
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		// Cliente -> Servidor: você pode modificar o tráfego aqui
-		relay(c.rwc, serverConn, func(data []byte) []byte {
-			log.Printf("Enviando do cliente para o servidor: %v", data)
-			return data
-		})
-	}()
-
-	go func() {
-		defer wg.Done()
-		// Servidor -> Cliente: você pode modificar o tráfego aqui
-		relay(serverConn, c.rwc, func(data []byte) []byte {
-			if !cryptEnabled {
-				return data
-			}
-
-			c.Decrypt(data, &loginCrypt, &gameCrypt, destPort)
-
-			return data
-		})
-	}()
-
-	wg.Wait()
-
-	return nil
+	return baseClient.HandleConnection()
 }
 
 func (c *Conn) Decrypt(data []byte, loginCrypt *LoginCrypt, gameCrypt *GameCrypt, port string) {

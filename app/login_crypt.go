@@ -17,6 +17,10 @@ type LoginCrypt struct {
 	crypt  Crypt
 }
 
+func (lc *LoginCrypt) DecryptFromClient(raw []byte, offset, size int) error {
+	return lc.decrypt(raw, offset, size)
+}
+
 func (lc *LoginCrypt) Decrypt(raw []byte, offset, size int) error {
 	if lc.isInit {
 		lc.isInit = false
@@ -24,6 +28,10 @@ func (lc *LoginCrypt) Decrypt(raw []byte, offset, size int) error {
 		return nil
 	}
 
+	return lc.decrypt(raw, offset, size)
+}
+
+func (lc *LoginCrypt) decrypt(raw []byte, offset, size int) error {
 	if offset+size > len(raw) {
 		return errors.New("raw array too short for size starting from offset")
 	}

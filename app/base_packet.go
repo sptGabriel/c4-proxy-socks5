@@ -7,45 +7,32 @@ import (
 
 var (
 	loginServerPORT = "2106"
-	gameServerPORT  = "7777"
+	// gameServerPORT  = "7777"
 )
 
-type crypt interface {
-	Decrypt(raw []byte, offset, size int) error
-	Encrypt(data []byte, offset, size int) []byte
+type mmoClient interface {
+	Encrypt(data []byte) ([]byte, error)
+	HandleData(data []byte)
+	HandleDataFromClient(data []byte)
 }
 
 type BaseClient struct {
-	cryptService crypt
+	mmoClient  mmoClient
+	clientConn net.Conn
+	serverConn net.Conn
 }
 
-// func (bc *BaseClient) InitializeCrypt(port string) error {
-// 	switch port {
-// 	case "2106":
-// 		loginCrypt, err := NewLoginCrypt()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		bc.loginCrypt = &loginCrypt
-// 		bc.cryptEnabled = true
-
-// 	case "7777":
-// 		gameCrypt := NewGameCrypt()
-// 		bc.gameCrypt = &gameCrypt
-// 		bc.cryptEnabled = true
-// 	}
-// 	return nil
-// }
-
-// Função para lidar com o tráfego de pacotes
-func (bc *BaseClient) HandleConnection(clientConn, serverConn net.Conn, port string) error {
+func (bc *BaseClient) HandleConnection() error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	// Cliente -> Servidor
 	go func() {
 		defer wg.Done()
-		relay(clientConn, serverConn, func(data []byte) []byte {
+		relay2(bc.clientConn, bc.serverConn, func(data []byte) []byte {
+			// fmt.Println("SEND TO SERVER -> ", data)
+			bc.mmoClient.HandleDataFromClient(data[2:])
+
 			return data
 		})
 	}()
@@ -54,26 +41,35 @@ func (bc *BaseClient) HandleConnection(clientConn, serverConn net.Conn, port str
 	go func() {
 		defer wg.Done()
 
+		relay2(bc.serverConn, bc.clientConn, func(data []byte) []byte {
+			//fmt.Println("RECEIVED FROM SERVER -> ", data)
+			bc.mmoClient.HandleData(data[2:])
+
+			return data
+		})
 	}()
 
 	wg.Wait()
 	return nil
 }
 
-func NewBaseClient(port string) (BaseClient, error) {
+func NewBaseClient(server, client net.Conn, port string) (BaseClient, error) {
 	if port == loginServerPORT {
-		loginCrypt, err := NewLoginCrypt()
+		loginClient, err := NewLoginClient()
 		if err != nil {
-			return BaseClient{}, nil
+			return BaseClient{}, err
 		}
 
 		return BaseClient{
-			cryptService: loginCrypt,
+			mmoClient:  loginClient,
+			clientConn: client,
+			serverConn: server,
 		}, nil
 	}
 
-	gameCrypt := NewGameCrypt()
 	return BaseClient{
-		cryptService: gameCrypt,
+		mmoClient:  NewGameClient(server),
+		clientConn: client,
+		serverConn: server,
 	}, nil
 }

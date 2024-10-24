@@ -3,6 +3,8 @@ package packets
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"io"
 )
 
 type Reader struct {
@@ -87,7 +89,16 @@ func (r *Reader) ReadUInt8() uint8 {
 	return result
 }
 
+func (r *Reader) Position() int64 {
+	position, _ := r.Seek(0, io.SeekCurrent)
+
+	return position
+}
+
 func (r *Reader) ReadString() string {
+	position, _ := r.Seek(0, io.SeekCurrent)
+	fmt.Print(position)
+
 	var result []byte
 	var first_byte, second_byte byte
 
@@ -101,5 +112,23 @@ func (r *Reader) ReadString() string {
 		}
 	}
 
+	positionend, _ := r.Seek(0, io.SeekCurrent)
+	fmt.Print(position, positionend)
+
 	return string(result)
+}
+
+func (r *Reader) ReadFloat64() float64 {
+	var result float64
+
+	buffer := make([]byte, 8)
+	n, _ := r.Read(buffer)
+	if n < 8 {
+		return 0
+	}
+
+	buf := bytes.NewBuffer(buffer)
+	binary.Read(buf, binary.LittleEndian, &result)
+
+	return result
 }
